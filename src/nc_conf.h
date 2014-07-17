@@ -71,6 +71,14 @@ struct conf_server {
     unsigned        valid:1;    /* valid? */
 };
 
+struct conf_sentinel {
+    struct string   pname;      /* sentinel: as "name:port" */
+    struct string   name;       /* name */
+    int             port;       /* port */
+    struct sockinfo info;       /* connect socket info */
+    unsigned        valid:1;    /* valid? */
+};
+
 struct conf_pool {
     struct string      name;                  /* pool name (root node) */
     struct conf_listen listen;                /* listen: */
@@ -87,6 +95,7 @@ struct conf_pool {
     int                server_retry_timeout;  /* server_retry_timeout: in msec */
     int                server_failure_limit;  /* server_failure_limit: */
     struct array       server;                /* servers: conf_server[] */
+    struct array       sentinel;              /* sentinels: conf_sentinel[] */
     unsigned           valid:1;               /* valid? */
 };
 
@@ -124,6 +133,7 @@ char *conf_set_bool(struct conf *cf, struct command *cmd, void *conf);
 char *conf_set_hash(struct conf *cf, struct command *cmd, void *conf);
 char *conf_set_distribution(struct conf *cf, struct command *cmd, void *conf);
 char *conf_set_hashtag(struct conf *cf, struct command *cmd, void *conf);
+char *conf_add_sentinel(struct conf *cf, struct command *cmd, void *conf);
 
 rstatus_t conf_server_each_transform(void *elem, void *data);
 rstatus_t conf_pool_each_transform(void *elem, void *data);

@@ -98,6 +98,10 @@ static struct command conf_commands[] = {
       conf_add_server,
       offsetof(struct conf_pool, server) },
 
+    { string("sentinels"),
+      conf_add_sentinel,
+      offsetof(struct conf_pool, sentinel) },
+
     null_command
 };
 
@@ -975,6 +979,10 @@ conf_validate_structure(struct conf *cf)
      *     - elem2
      *     - elem3
      *   key3: value3
+     *   seq2:
+     *     - elem1
+     *     - elem2
+     *     - elem3
      *
      * keyy:
      *   key1: value1
@@ -1035,11 +1043,7 @@ conf_validate_structure(struct conf *cf)
             break;
 
         case YAML_SEQUENCE_START_EVENT:
-            if (seq) {
-                error = true;
-                log_error("conf: '%s' has more than one sequence directive",
-                          cf->fname);
-            } else if (depth != CONF_MAX_DEPTH) {
+            if (depth != CONF_MAX_DEPTH) {
                 error = true;
                 log_error("conf: '%s' has sequence at depth %d instead of %d",
                           cf->fname, depth, CONF_MAX_DEPTH);
@@ -1600,6 +1604,12 @@ conf_add_server(struct conf *cf, struct command *cmd, void *conf)
     string_deinit(&address);
     field->valid = 1;
 
+    return CONF_OK;
+}
+
+char *
+conf_add_sentinel(struct conf *cf, struct command *cmd, void *conf) {
+    log_debug(LOG_VVERB, "found sentinel");
     return CONF_OK;
 }
 
