@@ -136,6 +136,7 @@ char *conf_set_hashtag(struct conf *cf, struct command *cmd, void *conf);
 char *conf_add_sentinel(struct conf *cf, struct command *cmd, void *conf);
 
 rstatus_t conf_server_each_transform(void *elem, void *data);
+rstatus_t conf_sentinel_each_transform(void *elem, void *data);
 rstatus_t conf_pool_each_transform(void *elem, void *data);
 
 struct conf *conf_create(char *filename);

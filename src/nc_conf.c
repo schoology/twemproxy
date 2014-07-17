@@ -186,6 +186,32 @@ conf_sentinel_deinit(struct conf_server *cs)
     log_debug(LOG_VVERB, "deinit conf sentinel %p", cs);
 }
 
+rstatus_t
+conf_sentinel_each_transform(void *elem, void *data)
+{
+    struct conf_sentinel *cs = elem;
+    struct array *sentinel = data;
+    struct sentinel *s;
+
+    ASSERT(cs->valid);
+
+    s = array_push(sentinel);
+    ASSERT(s != NULL);
+
+    s->owner = NULL;
+
+    s->pname = cs->pname;
+    s->port = (uint16_t)cs->port;
+
+    s->family = cs->info.family;
+    s->addrlen = cs->info.addrlen;
+    s->addr = (struct sockaddr *)&cs->info.addr;
+
+    log_debug(LOG_VERB, "transform to sentinel '%.*s'",
+              s->pname.len, s->pname.data);
+
+    return NC_OK;
+}
 
 static rstatus_t
 conf_pool_init(struct conf_pool *cp, struct string *name)
@@ -282,6 +308,7 @@ conf_pool_each_transform(void *elem, void *data)
     TAILQ_INIT(&sp->c_conn_q);
 
     array_null(&sp->server);
+    array_null(&sp->sentinel);
     sp->ncontinuum = 0;
     sp->nserver_continuum = 0;
     sp->continuum = NULL;
@@ -314,6 +341,11 @@ conf_pool_each_transform(void *elem, void *data)
     sp->preconnect = cp->preconnect ? 1 : 0;
 
     status = server_init(&sp->server, &cp->server, sp);
+    if (status != NC_OK) {
+        return status;
+    }
+
+    status = sentinel_init(&sp->sentinel, &cp->sentinel, sp);
     if (status != NC_OK) {
         return status;
     }

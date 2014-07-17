@@ -550,6 +550,67 @@ server_ok(struct context *ctx, struct conn *conn)
 }
 
 static rstatus_t
+sentinel_each_set_owner(void *elem, void *data)
+{
+    struct sentinel *s = elem;
+    struct server_pool *sp = data;
+
+    s->owner = sp;
+
+    return NC_OK;
+}
+   
+rstatus_t
+sentinel_init(struct array *sentinel, struct array *conf_sentinel,
+            struct server_pool *sp)
+{
+    rstatus_t status;
+    uint32_t nsentinel;
+
+    nsentinel = array_n(conf_sentinel);
+    ASSERT(nsentinel != 0);
+    ASSERT(array_n(sentinel) == 0);
+
+    status = array_init(sentinel, nsentinel, sizeof(struct sentinel));
+    if (status != NC_OK) {
+        return status;
+    }
+
+    /* transform conf_sentinel to sentinel */
+    status = array_each(conf_sentinel, conf_sentinel_each_transform, sentinel);
+    if (status != NC_OK) {
+        sentinel_deinit(sentinel);
+        return status;
+    }
+    ASSERT(array_n(sentinel) == nsentinel);
+
+    /* set sentinel owner */
+    status = array_each(sentinel, sentinel_each_set_owner, sp);
+    if (status != NC_OK) {
+        sentinel_deinit(sentinel);
+        return status;
+    }
+
+    log_debug(LOG_DEBUG, "init %"PRIu32" sentinels in pool %"PRIu32" '%.*s'",
+              nsentinel, sp->idx, sp->name.len, sp->name.data);
+
+    return NC_OK;
+}
+    
+void
+sentinel_deinit(struct array *sentinel)
+{
+    uint32_t i, nsentinel;
+
+    for (i = 0, nsentinel = array_n(sentinel); i < nsentinel; i++) {
+        struct sentinel *s;
+
+        s = array_pop(sentinel);
+    }
+    array_deinit(sentinel);
+}
+
+static rstatus_t
 server_pool_update(struct server_pool *pool)
 {
     rstatus_t status;

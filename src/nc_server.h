@@ -85,6 +85,18 @@ struct server {
     uint32_t           failure_count; /* # consecutive failures */
 };
 
+struct sentinel {
+    struct server_pool *owner;        /* owner pool */
+
+    struct string      pname;         /* name:port */
+    uint16_t           port;          /* port */
+    int                family;        /* socket family */
+    socklen_t          addrlen;       /* socket length */
+    struct sockaddr    *addr;         /* socket address (ref in conf_server) */
+
+    struct conn        *conn;         /* connection to sentinel */
+};
+
 struct server_pool {
     uint32_t           idx;                  /* pool index */
     struct context     *ctx;                 /* owner context */
@@ -94,6 +106,7 @@ struct server_pool {
     struct conn_tqh    c_conn_q;             /* client connection q */
 
     struct array       server;               /* server[] */
+    struct array       sentinel;             /* sentinel[] */
     uint32_t           ncontinuum;           /* # continuum points */
     uint32_t           nserver_continuum;    /* # servers - live and dead on continuum (const) */
     struct continuum   *continuum;           /* continuum */
@@ -132,6 +145,9 @@ rstatus_t server_connect(struct context *ctx, struct server *server, struct conn
 void server_close(struct context *ctx, struct conn *conn);
 void server_connected(struct context *ctx, struct conn *conn);
 void server_ok(struct context *ctx, struct conn *conn);
+
+rstatus_t sentinel_init(struct array *sentinel, struct array *conf_sentinel, struct server_pool *sp);
+void sentinel_deinit(struct array *sentinel);
 
 struct conn *server_pool_conn(struct context *ctx, struct server_pool *pool, uint8_t *key, uint32_t keylen);
 rstatus_t server_pool_run(struct server_pool *pool);
