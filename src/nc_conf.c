@@ -164,6 +164,28 @@ conf_server_each_transform(void *elem, void *data)
 
     return NC_OK;
 }
+    
+static void
+conf_sentinel_init(struct conf_server *cs)
+{
+    string_init(&cs->pname);
+    cs->port = 0;
+
+    memset(&cs->info, 0, sizeof(cs->info));
+
+    cs->valid = 0;
+
+    log_debug(LOG_VVERB, "init conf sentinel %p", cs);
+}
+
+static void
+conf_sentinel_deinit(struct conf_server *cs)
+{
+    string_deinit(&cs->pname);
+    cs->valid = 0;
+    log_debug(LOG_VVERB, "deinit conf sentinel %p", cs);
+}
+
 
 static rstatus_t
 conf_pool_init(struct conf_pool *cp, struct string *name)
@@ -195,6 +217,7 @@ conf_pool_init(struct conf_pool *cp, struct string *name)
     cp->server_failure_limit = CONF_UNSET_NUM;
 
     array_null(&cp->server);
+    array_null(&cp->sentinel);
 
     cp->valid = 0;
 
@@ -205,6 +228,13 @@ conf_pool_init(struct conf_pool *cp, struct string *name)
 
     status = array_init(&cp->server, CONF_DEFAULT_SERVERS,
                         sizeof(struct conf_server));
+    if (status != NC_OK) {
+        string_deinit(&cp->name);
+        return status;
+    }
+
+    status = array_init(&cp->sentinel, CONF_DEFAULT_SENTINELS,
+                        sizeof(struct conf_sentinel));
     if (status != NC_OK) {
         string_deinit(&cp->name);
         return status;
@@ -297,7 +327,7 @@ conf_pool_each_transform(void *elem, void *data)
 static void
 conf_dump(struct conf *cf)
 {
-    uint32_t i, j, npool, nserver;
+    uint32_t i, j, k, npool, nserver, nsentinel;
     struct conf_pool *cp;
     struct string *s;
 
@@ -338,6 +368,14 @@ conf_dump(struct conf *cf)
 
         for (j = 0; j < nserver; j++) {
             s = array_get(&cp->server, j);
+            log_debug(LOG_VVERB, "    %.*s", s->len, s->data);
+        }
+       
+        nsentinel = array_n(&cp->sentinel);
+        log_debug(LOG_VVERB, "  sentinels: %"PRIu32"", nsentinel);
+
+        for (k = 0; k < nsentinel; k++) {
+            s = array_get(&cp->sentinel, k);
             log_debug(LOG_VVERB, "    %.*s", s->len, s->data);
         }
     }
@@ -1609,7 +1647,73 @@ conf_add_server(struct conf *cf, struct command *cmd, void *conf)
 
 char *
 conf_add_sentinel(struct conf *cf, struct command *cmd, void *conf) {
-    log_debug(LOG_VVERB, "found sentinel");
+    rstatus_t status;
+    struct array *a;
+    struct string *value;
+    struct conf_server *field;
+    uint8_t *p, *q, *start;
+    uint8_t *addr, *port;
+    uint32_t addrlen, portlen;
+    struct string address;
+
+    string_init(&address);
+    p = conf;
+    a = (struct array *)(p + cmd->offset);
+
+    field = array_push(a);
+    if (field == NULL) {
+        return CONF_ERROR;
+    }
+
+    conf_sentinel_init(field);
+
+    value = array_top(&cf->arg);
+
+    /* parse "hostname:port" or "/path/unix_socket" from the end */
+    p = value->data + value->len - 1;
+    start = value->data;
+    addr = NULL;
+    addrlen = 0;
+    port = NULL;
+    portlen = 0;
+
+    status = string_copy(&field->pname, value->data, value->len);
+    if (status != NC_OK) {
+        array_pop(a);
+        return CONF_ERROR;
+    }
+
+    if (value->data[0] != '/') {
+        q = nc_strrchr(p, start, ':');
+        port = q + 1;
+        portlen = (uint32_t)(p - port + 1);
+        field->port = nc_atoi(port, portlen);
+
+        if (field->port < 0 || !nc_valid_port(field->port)) {
+            conf_sentinel_deinit(field);
+            return "has an invalid port in \"hostname:port\" format string";
+        }
+        addrlen = (uint32_t)(q - start);
+    }
+    else {
+        addrlen = value->len;
+    }
+
+    addr = start;
+    status = string_copy(&address, addr, addrlen);
+    if (status != NC_OK) {
+        return CONF_ERROR;
+    }
+
+    status = nc_resolve(&address, field->port, &field->info);
+    if (status != NC_OK) {
+        string_deinit(&address);
+        return CONF_ERROR;
+    }
+
+    string_deinit(&address);
+    field->valid = 1;
+
     return CONF_OK;
 }
 

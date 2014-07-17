@@ -35,6 +35,7 @@
 #define CONF_DEFAULT_ARGS       3
 #define CONF_DEFAULT_POOL       8
 #define CONF_DEFAULT_SERVERS    8
+#define CONF_DEFAULT_SENTINELS    8
 
 #define CONF_UNSET_NUM  -1
 #define CONF_UNSET_PTR  NULL
@@ -73,7 +74,6 @@ struct conf_server {
 
 struct conf_sentinel {
     struct string   pname;      /* sentinel: as "name:port" */
-    struct string   name;       /* name */
     int             port;       /* port */
     struct sockinfo info;       /* connect socket info */
     unsigned        valid:1;    /* valid? */
